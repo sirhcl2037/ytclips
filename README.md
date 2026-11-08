@@ -50,6 +50,8 @@ If that interpreter is not on PATH, set `PYTHON_BIN` in `.env` as well. Rerunnin
 
 The preview uses YouTube playback, with boundaries rounded to whole seconds. Its playback quality is independent of the export selection. Videos with embedding disabled can still be opened through the source link.
 
+If YouTube rejects the selected audio with a 403 before output starts, the processor retries with an available HLS audio stream and displays a notice. The selected video stream stays unchanged. For MKV, fallback audio is converted to lossless FLAC for container compatibility; MP4 uses its usual AAC encoding.
+
 ## Streaming and resource usage
 
 ```text

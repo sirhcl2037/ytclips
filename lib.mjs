@@ -52,6 +52,12 @@ export function safeName(title) {
   return title.replace(/[^\p{L}\p{N} ._-]/gu, '').trim().slice(0, 90) || 'youtube-clip';
 }
 
+export function alternateAudio(info, error) {
+  if (!/403|forbidden/i.test(error.message) || !/in#1/.test(error.message) || info.requested_formats?.length !== 2) return null;
+  const audio = (info.formats || []).filter(f => f.vcodec === 'none' && f.acodec !== 'none' && !f.has_drm && f.url && /^m3u8/.test(f.protocol || '')).at(-1);
+  return audio ? [info.requested_formats[0], { ...audio, losslessAudio: true }] : null;
+}
+
 export function mediaUrl(value) {
   const url = new URL(value);
   if (url.protocol !== 'https:' || url.username || url.password || url.port ||
@@ -69,6 +75,7 @@ export function ffmpegArgs(streams, clip, output, streaming = false) {
       /^[A-Za-z-]+$/.test(k) && !/[\r\n]/.test(String(v)) && !['host', 'authorization', 'cookie'].includes(k.toLowerCase())
     ).map(([k, v]) => `${k}: ${v}\r\n`).join('');
     if (headers) args.push('-headers', headers);
+    if (clip.container === 'mkv' && streams.some(s => s.losslessAudio)) args.push('-noaccurate_seek');
     args.push('-ss', String(clip.start), '-i', mediaUrl(stream.url));
   }
   args.push('-t', String(clip.end - clip.start), '-map', '0:v:0');
@@ -77,7 +84,11 @@ export function ffmpegArgs(streams, clip, output, streaming = false) {
   if (clip.container === 'mp4') {
     args.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p',
       '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2', '-c:a', 'aac', '-b:a', '192k', '-movflags', streaming ? '+frag_keyframe+empty_moov+default_base_moof' : '+faststart');
-  } else args.push('-c', 'copy', '-avoid_negative_ts', 'make_zero');
+  } else {
+    args.push('-c', 'copy', '-avoid_negative_ts', 'make_zero');
+    const audio = streams.length > 1 ? streams[1] : streams[0];
+    if (audio.losslessAudio) args.push('-c:a', 'flac');
+  }
   if (streaming) args.push('-f', clip.container === 'mp4' ? 'mp4' : 'matroska');
   args.push('-progress', streaming ? 'pipe:2' : 'pipe:1', '-nostats', output);
   return args;

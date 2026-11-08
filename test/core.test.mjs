@@ -1,10 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { youtubeUrl, parseTime, summarizeVideo, validateClip, mediaUrl, ffmpegArgs } from '../lib.mjs';
+import { youtubeUrl, parseTime, summarizeVideo, validateClip, mediaUrl, ffmpegArgs, alternateAudio } from '../lib.mjs';
 
 test('accepts video links and removes playlist/tracking data; rejects arbitrary URLs', () => {
   for (const url of ['https://youtu.be/BaW_jenozKc?t=30', 'https://www.youtube.com/watch?v=BaW_jenozKc&list=123', 'https://youtube.com/shorts/BaW_jenozKc']) assert.equal(youtubeUrl(url), 'https://www.youtube.com/watch?v=BaW_jenozKc');
   for (const url of ['http://youtube.com/watch?v=BaW_jenozKc', 'https://youtube.com.evil.test/watch?v=BaW_jenozKc', 'https://127.0.0.1/test', 'file:///etc/passwd', 'https://youtube.com/playlist?list=123', 'https://evil@youtube.com/watch?v=BaW_jenozKc']) assert.throws(() => youtubeUrl(url));
+});
+
+test('audio 403 retry preserves exact video and never retries after unrelated failures', () => {
+  const video = { format_id: '628', url: 'https://r.googlevideo.com/video' }, oldAudio = { format_id: '251' }, audio = { format_id: '234', protocol: 'm3u8_native', vcodec: 'none', url: 'https://r.googlevideo.com/audio' };
+  const info = { requested_formats: [video, oldAudio], formats: [audio] };
+  const alternate = alternateAudio(info, new Error('[in#1] HTTP error 403 Forbidden'));
+  assert.deepEqual(alternate, [video, { ...audio, losslessAudio: true }]);
+  const args = ffmpegArgs(alternate, { start: 0, end: 1, container: 'mkv' }, 'pipe:1', true);
+  assert.ok(args.includes('copy')); assert.equal(args[args.indexOf('-c:a') + 1], 'flac');
+  assert.equal(alternateAudio(info, new Error('[in#0] HTTP error 403 Forbidden')), null);
+  assert.equal(alternateAudio(info, new Error('Cancelled.')), null);
+  assert.equal(alternateAudio({ ...info, formats: [] }, new Error('[in#1] HTTP error 403 Forbidden')), null);
 });
 test('validates timestamps without accepting overflow or invalid segments', () => {
   assert.equal(parseTime('1:02:03.125'), 3723.125); assert.equal(parseTime('01:30'), 90); assert.equal(parseTime('90.5'), 90.5);

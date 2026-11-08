@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { randomUUID, randomBytes, timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
-import { youtubeUrl, summarizeVideo, validateClip, safeName, ffmpegArgs } from './lib.mjs';
+import { youtubeUrl, summarizeVideo, validateClip, safeName, ffmpegArgs, alternateAudio } from './lib.mjs';
 import { root, extract, streamMedia, userError, stopChildren } from './media.mjs';
 
 const number = (name, fallback, min = 1) => Math.max(min, Number(process.env[name]) || fallback);
@@ -104,11 +104,18 @@ const server = http.createServer(async (req, res) => {
         const info = await extract(job.streamSpec.url, job.streamSpec.clip.format, job.controller.signal);
         const streams = info.requested_formats || [info];
         if (streams[0].format_id !== job.streamSpec.clip.format.id) throw new Error('Requested format is not available');
-        await streamMedia(ffmpegArgs(streams, job.streamSpec.clip, 'pipe:1', true), res, {
+        const send = selected => streamMedia(ffmpegArgs(selected, job.streamSpec.clip, 'pipe:1', true), res, {
           signal: job.controller.signal,
           onStart: () => res.writeHead(200, { 'Content-Type': job.container === 'mp4' ? 'video/mp4' : 'video/x-matroska', 'Cache-Control': 'no-store', 'Accept-Ranges': 'none', 'Content-Disposition': `attachment; filename="clip.${job.container}"; filename*=UTF-8''${encodeURIComponent(job.filename)}` }),
           onProgress: seconds => { job.progress = Math.min(99, Math.max(0, seconds / job.result.duration * 100)); },
         });
+        try { await send(streams); }
+        catch (error) {
+          const alternate = !res.headersSent && !job.controller.signal.aborted && alternateAudio(info, error);
+          if (!alternate) throw error;
+          job.result.warning = 'YouTube rejected the original audio stream. Using alternate audio' + (job.container === 'mkv' ? ' converted to lossless FLAC' : '') + '; selected video quality is unchanged.';
+          await send(alternate);
+        }
         job.transfer = 'complete'; job.progress = 100;
       } catch (error) {
         job.transfer = 'error'; job.error = userError(error);

@@ -15,7 +15,7 @@ async function wait(job) {
   }
   if (job.status !== 'done') throw new Error(job.error); return job;
 }
-const info = (await wait(await request('/api/inspect', { url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ' }))).result;
+const info = (await wait(await request('/api/inspect', { url: process.env.TEST_VIDEO_URL || 'https://www.youtube.com/watch?v=aqz-KE-bpKQ' }))).result;
 const chosen = info.formats[0];
 console.log(`Live source: ${info.formats.length} formats; selected ${chosen.height}p ${chosen.fps}fps ${chosen.codec} [${chosen.id}]`);
 const prepared = await wait(await request('/api/clips', { videoId: info.videoId, start: 10, end: 12, formatId: chosen.id, container: 'mkv' }));
