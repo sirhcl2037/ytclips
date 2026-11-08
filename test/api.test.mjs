@@ -16,6 +16,8 @@ test('API serves UI, enforces password/CORS, and rejects unsafe URLs before crea
     assert.equal(invalid.status, 400);
     const preflight = await fetch(`${base}/api/inspect`, { method: 'OPTIONS', headers: { Origin: 'https://green-wave-01024401e.3.azurestaticapps.net' } });
     assert.equal(preflight.status, 204); assert.equal(preflight.headers.get('access-control-allow-private-network'), 'true');
+    const local = await fetch(`${base}/api/health`, { headers: { Origin: 'http://127.0.0.1:5173' } });
+    assert.equal(local.status, 200); assert.equal(local.headers.get('access-control-allow-origin'), 'http://127.0.0.1:5173');
     assert.equal((await fetch(`${base}/api/files/00000000-0000-0000-0000-000000000000?ticket=bad`)).status, 404);
   } finally { server.kill(); }
 });

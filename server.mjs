@@ -11,6 +11,8 @@ const host = process.env.HOST || '127.0.0.1', port = number('PORT', 8787);
 const password = process.env.APP_PASSWORD || '';
 if (!['127.0.0.1', 'localhost', '::1'].includes(host) && password.length < 16) throw new Error('Set APP_PASSWORD to at least 16 characters before exposing this server.');
 const allowed = new Set((process.env.ALLOWED_ORIGINS || 'https://green-wave-01024401e.3.azurestaticapps.net').split(',').map(s => s.trim()));
+allowed.add('http://127.0.0.1:5173');
+allowed.add('http://localhost:5173');
 const ttl = number('JOB_TTL_MINUTES', 60) * 60000, maxClip = number('MAX_CLIP_SECONDS', 1800);
 const jobs = new Map(), videos = new Map(), queue = [], rates = new Map();
 let working = false, stopping = false, streaming = false;
