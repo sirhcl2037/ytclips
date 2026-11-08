@@ -1,0 +1,14 @@
+{
+  "name": "pongmetrics-clips",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "dev": "node --env-file-if-exists=.env --watch server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "setup": "node scripts/setup.mjs",
+    "integrate": "node scripts/integrate.mjs"
+  }
+}

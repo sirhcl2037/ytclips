@@ -1,0 +1,6 @@
+.env
+.venv/
+.tools/
+data/
+node_modules/
+*.log
